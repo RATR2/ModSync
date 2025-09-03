@@ -1,4 +1,4 @@
-package com.yourname.modsync.common;
+package com.rat.modsync.common;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

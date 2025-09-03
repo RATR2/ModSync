@@ -1,6 +1,6 @@
-package com.yourname.modsync.forge;
+package com.rat.modsync.forge;
 
-import com.yourname.modsync.common.*;
+import com.rat.modsync.common.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.Screen;

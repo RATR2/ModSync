@@ -1,4 +1,4 @@
-package com.yourname.modsync.common;
+package com.rat.modsync.common;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -165,7 +165,7 @@ public class ModSync {
             List<ModInfo> serverMods = handshake.getRequiredMods();
             List<ModInfo> clientMods = modListManager.getClientMods();
 
-            ModListComparison comparison = modListManager.compareMods(clientMods, serverMods);
+            ModListManager.ModListComparison comparison = modListManager.compareMods(clientMods, serverMods);
 
             if (comparison.isCompatible()) {
                 // All good, continue connection
@@ -182,7 +182,7 @@ public class ModSync {
         }
     }
 
-    private static void handleModMismatch(ServerHandshake handshake, ModListComparison comparison) {
+    private static void handleModMismatch(ServerHandshake handshake, ModListManager.ModListComparison comparison) {
         if (configManager.getClientConfig().isAutoAcceptDownloads()) {
             // Auto-download without prompting
             startModDownload(handshake, comparison);
@@ -206,7 +206,7 @@ public class ModSync {
         }
     }
 
-    private static void startModDownload(ServerHandshake handshake, ModListComparison comparison) {
+    private static void startModDownload(ServerHandshake handshake, ModListManager.ModListComparison comparison) {
         try {
             if (handshake.isZipMode()) {
                 // Download entire modpack as zip

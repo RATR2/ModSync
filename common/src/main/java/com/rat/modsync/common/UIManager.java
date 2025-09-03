@@ -1,4 +1,4 @@
-package com.yourname.modsync.common;
+package com.rat.modsync.common;
 
 import java.util.ArrayList;
 import java.util.List;

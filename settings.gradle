@@ -9,5 +9,5 @@ pluginManagement {
 rootProject.name = 'modsync'
 
 include 'common'
-include 'forge'
+//include 'forge'
 include 'fabric'

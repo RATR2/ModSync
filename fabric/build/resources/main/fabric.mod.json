@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "modsync",
+  "version": "1.0.0+1.21.1",
+  "name": "ModSync",
+  "description": "ModSync allows players to join modded Minecraft servers easily without manually installing mods or modpacks. Supports automatic mod downloading, version synchronization, and seamless server connections.",
+  "authors": [
+    "R4T"
+  ],
+  "contact": {
+    "homepage": "https://github.com/yourname/modsync",
+    "sources": "https://github.com/yourname/modsync",
+    "issues": "https://github.com/yourname/modsync/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/modsync/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.rat.modsync.fabric.ModSyncFabric"
+    ],
+    "client": [
+      "com.rat.modsync.fabric.ModSyncFabric"
+    ],
+    "server": [
+      "com.rat.modsync.fabric.ModSyncFabric"
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "fabric-api": "*",
+    "minecraft": "~1.21.1",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}

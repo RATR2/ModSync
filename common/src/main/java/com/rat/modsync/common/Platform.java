@@ -1,4 +1,4 @@
-package com.yourname.modsync.common;
+package com.rat.modsync.common;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -81,6 +81,14 @@ public interface Platform {
      */
     ModInfo getModInfo(String modId);
 
+    /**
+     * Connect the client to a server (client-side)
+     */
+    void connectToServer(String serverAddress);
+
+    // -------------------------
+    // Nested enums
+    // -------------------------
     enum LoaderType {
         FORGE, FABRIC
     }
@@ -93,6 +101,9 @@ public interface Platform {
         ACCEPT, DECLINE, CANCEL
     }
 
+    // -------------------------
+    // Packet handler functional interface
+    // -------------------------
     @FunctionalInterface
     interface PacketHandler {
         void handle(Object sender, byte[] data);

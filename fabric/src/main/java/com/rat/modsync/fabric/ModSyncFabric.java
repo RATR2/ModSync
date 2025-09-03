@@ -1,11 +1,10 @@
-package com.yourname.modsync.fabric;
+package com.rat.modsync.fabric;
 
-import com.yourname.modsync.common.*;
+import com.rat.modsync.common.*;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -13,10 +12,9 @@ import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import io.netty.buffer.Unpooled;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -36,52 +34,45 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     public void onInitialize() {
         INSTANCE = this;
         ModSync.initialize(this);
-
-        // Register networking
         setupNetworking();
     }
 
     @Override
     public void onInitializeClient() {
-        // Client-specific initialization
         ModSync.handleStartup();
     }
 
     @Override
     public void onInitializeServer() {
-        // Server-specific initialization
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            // Send handshake to joining player
-            ServerPlayer player = handler.getPlayer();
-            sendServerHandshake(player);
+            sendServerHandshake(handler.getPlayer());
         });
     }
 
     private void setupNetworking() {
-        // Register payload types
-        PayloadTypeRegistry.playS2C().register(GenericPayload.TYPE, GenericPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(GenericPayload.TYPE, GenericPayload.CODEC);
-
-        // Register handlers
-        if (FabricLoader.getInstance().getEnvironmentType().name().equals("CLIENT")) {
-            ClientPlayNetworking.registerGlobalReceiver(GenericPayload.TYPE, this::handleClientPacket);
+        // Client-side handler
+        if (isClient()) {
+            ClientPlayNetworking.registerGlobalReceiver(new ResourceLocation(ModSync.MOD_ID, "generic"), (client, handler, buf, responseSender) -> {
+                byte[] data = new byte[buf.readableBytes()];
+                buf.readBytes(data);
+                GenericPayload payload = new GenericPayload("generic", data);
+                PacketHandler handlerImpl = packetHandlers.get(payload.channel());
+                if (handlerImpl != null) {
+                    handlerImpl.handle(null, payload.data());
+                }
+            });
         }
 
-        ServerPlayNetworking.registerGlobalReceiver(GenericPayload.TYPE, this::handleServerPacket);
-    }
-
-    private void handleClientPacket(GenericPayload payload, ClientPlayNetworking.Context context) {
-        PacketHandler handler = packetHandlers.get(payload.channel());
-        if (handler != null) {
-            handler.handle(null, payload.data()); // Client doesn't have sender
-        }
-    }
-
-    private void handleServerPacket(GenericPayload payload, ServerPlayNetworking.Context context) {
-        PacketHandler handler = packetHandlers.get(payload.channel());
-        if (handler != null) {
-            handler.handle(context.player(), payload.data());
-        }
+        // Server-side handler
+        ServerPlayNetworking.registerGlobalReceiver(new ResourceLocation(ModSync.MOD_ID, "generic"), (server, player, handler, buf, responseSender) -> {
+            byte[] data = new byte[buf.readableBytes()];
+            buf.readBytes(data);
+            GenericPayload payload = new GenericPayload("generic", data);
+            PacketHandler handlerImpl = packetHandlers.get(payload.channel());
+            if (handlerImpl != null) {
+                handlerImpl.handle(player, payload.data());
+            }
+        });
     }
 
     private void sendServerHandshake(ServerPlayer player) {
@@ -138,24 +129,19 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
         String version = container.getMetadata().getVersion().getFriendlyString();
         String name = container.getMetadata().getName();
         String fileName = container.getOrigin().getPaths().get(0).getFileName().toString();
-
         return new ModInfo(modId, version, name, fileName);
     }
 
     @Override
     public void sendToServer(String channel, byte[] data) {
         if (!isClient()) return;
-
-        GenericPayload payload = new GenericPayload(channel, data);
-        ClientPlayNetworking.send(payload);
+        ClientPlayNetworking.send(new ResourceLocation(ModSync.MOD_ID, channel), new FriendlyByteBuf(Unpooled.wrappedBuffer(data)));
     }
 
     @Override
     public void sendToClient(Object player, String channel, byte[] data) {
         if (!(player instanceof ServerPlayer)) return;
-
-        GenericPayload payload = new GenericPayload(channel, data);
-        ServerPlayNetworking.send((ServerPlayer) player, payload);
+        ServerPlayNetworking.send((ServerPlayer) player, new ResourceLocation(ModSync.MOD_ID, channel), new FriendlyByteBuf(Unpooled.wrappedBuffer(data)));
     }
 
     @Override
@@ -166,19 +152,14 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     @Override
     public void scheduleRestart() {
         if (!isClient()) return;
-
-        Minecraft.getInstance().execute(() -> {
-            Minecraft.getInstance().stop();
-        });
+        Minecraft.getInstance().execute(() -> Minecraft.getInstance().stop());
     }
 
     @Override
     public void showNotification(String title, String message, NotificationType type) {
         if (!isClient()) return;
-
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            // Show as chat message (simple implementation)
             mc.player.sendSystemMessage(Component.literal("[" + title + "] " + message));
         }
     }
@@ -188,13 +169,10 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
         if (!isClient()) return CompletableFuture.completedFuture(DialogResult.CANCEL);
 
         CompletableFuture<DialogResult> future = new CompletableFuture<>();
-
         Minecraft.getInstance().execute(() -> {
-            // Show notification and auto-accept for now
             showNotification(title, message, NotificationType.INFO);
             future.complete(DialogResult.ACCEPT);
         });
-
         return future;
     }
 
@@ -220,35 +198,23 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     @Override
     public void connectToServer(String serverAddress) {
         if (!isClient()) return;
-
-        Minecraft.getInstance().execute(() -> {
-            // Implementation would connect to server programmatically
-            // This is a simplified version
-            showNotification("ModSync", "Reconnecting to " + serverAddress, NotificationType.INFO);
-        });
+        Minecraft.getInstance().execute(() ->
+                showNotification("ModSync", "Reconnecting to " + serverAddress, NotificationType.INFO));
     }
 
     /**
-     * Generic payload for all ModSync network communication
+     * Simple payload wrapper for Fabric networking
      */
-    public record GenericPayload(String channel, byte[] data) implements CustomPacketPayload {
-        public static final Type<GenericPayload> TYPE = new Type<>(new ResourceLocation(ModSync.MOD_ID, "generic"));
+    public static class GenericPayload {
+        private final String channel;
+        private final byte[] data;
 
-        public static final StreamCodec<FriendlyByteBuf, GenericPayload> CODEC = StreamCodec.composite(
-                StreamCodec.of(
-                        (buf, channel) -> buf.writeUtf(channel),
-                        buf -> buf.readUtf()
-                ), GenericPayload::channel,
-                StreamCodec.of(
-                        (buf, data) -> buf.writeByteArray(data),
-                        buf -> buf.readByteArray()
-                ), GenericPayload::data,
-                GenericPayload::new
-        );
-
-        @Override
-        public Type<? extends CustomPacketPayload> type() {
-            return TYPE;
+        public GenericPayload(String channel, byte[] data) {
+            this.channel = channel;
+            this.data = data;
         }
+
+        public String channel() { return channel; }
+        public byte[] data() { return data; }
     }
 }
