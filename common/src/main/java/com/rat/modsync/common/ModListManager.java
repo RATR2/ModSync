@@ -125,4 +125,48 @@ public class ModListManager {
                     getModName(), getClientVersion(), getServerVersion());
         }
     }
+
+    /**
+     * Process a server list entry from the multiplayer screen ping response.
+     * Extract ModSync handshake/mod list data from MOTD, compare mods, and trigger UI logic if needed.
+     */
+    public void processServerListEntry(Object entry) {
+        try {
+            // Use reflection to get MOTD from entry
+            String motd = null;
+            try {
+                motd = (String) entry.getClass().getMethod("getMotd").invoke(entry);
+            } catch (Exception ignored) {}
+            if (motd == null || motd.isEmpty()) return;
+
+            // Look for ModSync marker in MOTD
+            String marker = "§8[ModSync]";
+            int idx = motd.indexOf(marker);
+            if (idx == -1) return;
+            String modSyncJson = motd.substring(idx + marker.length()).trim();
+            if (modSyncJson.isEmpty()) return;
+
+            // Parse the server's mod list from the ModSync handshake
+            List<ModInfo> serverMods = new com.google.gson.Gson().fromJson(modSyncJson,
+                    new com.google.gson.reflect.TypeToken<List<ModInfo>>(){}.getType());
+            List<ModInfo> clientMods = getClientMods();
+            ModListComparison comparison = compareMods(clientMods, serverMods);
+
+            boolean hasIssues = comparison.hasIssues();
+            // Set the modsyncMissingMods flag using reflection
+            try {
+                entry.getClass().getMethod("modsync$setModsyncMissingMods", boolean.class)
+                    .invoke(entry, hasIssues);
+            } catch (Exception ignored) {}
+
+            if (hasIssues) {
+                // Trigger ModSync UI logic to prompt the user and block connection
+                ModSync.getUIManager().showWarning("ModSync: Missing Mods",
+                        "This server requires mods you do not have: " + comparison.getSummary());
+                // Optionally, block the Join Server button via mixin logic
+            }
+        } catch (Exception e) {
+            // Ignore if ModSync data is not present
+        }
+    }
 }

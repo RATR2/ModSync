@@ -5,7 +5,7 @@ plugins {
 
 group = 'com.rat.modsync'
 version = '1.0.0'
-archivesBaseName = 'modsync'
+archivesBaseName = 'modsync-forge'
 
 repositories {
     mavenCentral()

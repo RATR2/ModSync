@@ -44,6 +44,9 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
 
     @Override
     public void onInitializeClient() {
+        System.out.println("[ModSync] onInitializeClient called");
+        LOGGER.info("ModSyncFabric: Client initialization started");
+        ModSync.initialize(this);
         ModSync.handleStartup();
     }
 
@@ -79,19 +82,20 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     }
 
     private void sendServerHandshake(ServerPlayerEntity player) {
+        LOGGER.info("Server > Checking client for ModSync");
         List<ModInfo> serverMods = getLoadedMods();
         ConfigManager.ServerConfig config = ModSync.getConfigManager().getServerConfig();
-
         ModSync.ServerHandshake handshake = new ModSync.ServerHandshake(
                 serverMods,
                 config.isZipModeEnabled(),
                 config.getZipUrl(),
-                config.getZipHash()
+                config.getZipHash(),
+                ModSync.VERSION
         );
-
         try {
             String json = new com.google.gson.Gson().toJson(handshake);
             sendToClient(player, ModSync.HANDSHAKE_CHANNEL, json.getBytes());
+            LOGGER.info("Server > Sent handshake to client");
         } catch (Exception e) {
             LOGGER.warning("Failed to send handshake to player: " + e.getMessage());
         }
@@ -131,19 +135,31 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
         String modId = container.getMetadata().getId();
         String version = container.getMetadata().getVersion().getFriendlyString();
         String name = container.getMetadata().getName();
-        String fileName = container.getOrigin().getPaths().get(0).getFileName().toString();
+        String fileName;
+        try {
+            // Some mod origins (NESTED, BUILTIN, etc.) do not support getPaths()
+            if (container.getOrigin().getKind().name().equalsIgnoreCase("PATH")) {
+                fileName = container.getOrigin().getPaths().get(0).getFileName().toString();
+            } else {
+                fileName = modId + ".jar"; // Fallback for NESTED or BUILTIN mods
+            }
+        } catch (Exception e) {
+            fileName = modId + ".jar"; // Fallback on error
+        }
         return new ModInfo(modId, version, name, fileName);
     }
 
     @Override
     public void sendToServer(String channel, byte[] data) {
         if (!isClient()) return;
+        LOGGER.info("Client > Sending packet to server on channel: " + channel);
         ClientPlayNetworking.send(new GenericPayload(channel, data));
     }
 
     @Override
     public void sendToClient(Object player, String channel, byte[] data) {
         if (!(player instanceof ServerPlayerEntity)) return;
+        LOGGER.info("Server > Sending packet to client on channel: " + channel);
         ServerPlayNetworking.send((ServerPlayerEntity) player, new GenericPayload(channel, data));
     }
 

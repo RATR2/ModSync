@@ -101,6 +101,7 @@ public class ModSyncForge implements Platform {
     @Override
     public void sendToServer(String channel, byte[] data) {
         if (!isClient()) return;
+        LOGGER.info("Client > Sending packet to server on channel: " + channel);
         // TODO: Implement networking - Forge's networking API has changed significantly
         // This will need to use the new packet system
         LOGGER.info("Sending packet to server on channel: " + channel);
@@ -109,6 +110,7 @@ public class ModSyncForge implements Platform {
     @Override
     public void sendToClient(Object player, String channel, byte[] data) {
         if (!(player instanceof ServerPlayer)) return;
+        LOGGER.info("Server > Sending packet to client on channel: " + channel);
         // TODO: Implement networking - Forge's networking API has changed significantly
         LOGGER.info("Sending packet to client on channel: " + channel);
     }
@@ -215,21 +217,24 @@ public class ModSyncForge implements Platform {
         // Send handshake to joining player
         ServerPlayer player = (ServerPlayer) event.getEntity();
         LOGGER.info("Player joined: " + player.getName().getString());
+        sendServerHandshake(player);
+    }
 
-        // Build server mod manifest
+    private void sendServerHandshake(ServerPlayer player) {
+        LOGGER.info("Server > Checking client for ModSync");
         List<ModInfo> serverMods = getLoadedMods();
         ConfigManager.ServerConfig config = ModSync.getConfigManager().getServerConfig();
-
         ModSync.ServerHandshake handshake = new ModSync.ServerHandshake(
                 serverMods,
                 config.isZipModeEnabled(),
                 config.getZipUrl(),
-                config.getZipHash()
+                config.getZipHash(),
+                ModSync.VERSION
         );
-
         try {
             String json = new com.google.gson.Gson().toJson(handshake);
             sendToClient(player, ModSync.HANDSHAKE_CHANNEL, json.getBytes());
+            LOGGER.info("Server > Sent handshake to client");
         } catch (Exception e) {
             LOGGER.warning("Failed to send handshake to player: " + e.getMessage());
         }

@@ -133,6 +133,19 @@ public class ModSync {
             byte[] responseData = GSON.toJson(response).getBytes();
             platform.sendToClient(sender, PING_CHANNEL, responseData);
 
+            // Send handshake after ping response
+            List<ModInfo> serverMods = modListManager.getServerMods();
+            ConfigManager.ServerConfig config = configManager.getServerConfig();
+            ServerHandshake handshake = new ServerHandshake(
+                serverMods,
+                config.isZipModeEnabled(),
+                config.getZipUrl(),
+                config.getZipHash(),
+                VERSION
+            );
+            byte[] handshakeData = GSON.toJson(handshake).getBytes();
+            platform.sendToClient(sender, HANDSHAKE_CHANNEL, handshakeData);
+
         } catch (Exception e) {
             LOGGER.warning("Failed to handle ping request: " + e.getMessage());
         }
@@ -161,6 +174,13 @@ public class ModSync {
             ServerHandshake handshake = GSON.fromJson(json, ServerHandshake.class);
             awaitingHandshake = false;
 
+            // Version check
+            if (!VERSION.equals(handshake.getModSyncVersion())) {
+                String warnMsg = "ModSync version mismatch! Server: " + handshake.getModSyncVersion() + ", Client: " + VERSION;
+                LOGGER.warning(warnMsg);
+                uiManager.showWarning("ModSync Version Mismatch", warnMsg);
+            }
+
             // Compare mod lists
             List<ModInfo> serverMods = handshake.getRequiredMods();
             List<ModInfo> clientMods = modListManager.getClientMods();
@@ -170,9 +190,11 @@ public class ModSync {
             if (comparison.isCompatible()) {
                 // All good, continue connection
                 LOGGER.info("Mod compatibility check passed for server " + pendingServerAddress);
+                uiManager.showNotification("ModSync", "ModSync is active on both server and client!", Platform.NotificationType.SUCCESS);
                 completeHandshake();
             } else {
                 // Handle missing/mismatched mods
+                uiManager.showNotification("ModSync", "ModSync detected, but mod lists do not match!", Platform.NotificationType.WARNING);
                 handleModMismatch(handshake, comparison);
             }
 
@@ -246,6 +268,7 @@ public class ModSync {
         } else {
             uiManager.showInfo("ModSync Complete",
                     "Mods downloaded successfully. Please restart Minecraft manually to continue.");
+
         }
     }
 
@@ -354,18 +377,21 @@ public class ModSync {
         private final boolean zipMode;
         private final String zipUrl;
         private final String zipHash;
+        private final String modSyncVersion;
 
-        public ServerHandshake(List<ModInfo> requiredMods, boolean zipMode, String zipUrl, String zipHash) {
+        public ServerHandshake(List<ModInfo> requiredMods, boolean zipMode, String zipUrl, String zipHash, String modSyncVersion) {
             this.requiredMods = requiredMods;
             this.zipMode = zipMode;
             this.zipUrl = zipUrl;
             this.zipHash = zipHash;
+            this.modSyncVersion = modSyncVersion;
         }
 
         public List<ModInfo> getRequiredMods() { return requiredMods; }
         public boolean isZipMode() { return zipMode; }
         public String getZipUrl() { return zipUrl; }
         public String getZipHash() { return zipHash; }
+        public String getModSyncVersion() { return modSyncVersion; }
     }
 
     public static class HandshakeComplete {

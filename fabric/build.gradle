@@ -5,7 +5,7 @@ plugins {
 version = project.version + '+' + project.minecraft_version
 
 base {
-    archivesName = project.archives_base_name
+    archivesName = project.archives_base_name + "-fabric"
 }
 
 dependencies {
