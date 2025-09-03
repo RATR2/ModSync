@@ -1,17 +1,39 @@
 plugins {
-    id 'net.minecraftforge.gradle' version '5.1.+'
+    id 'net.minecraftforge.gradle' version '6.0.+'
 }
 
 version = '1.21.1-1.0.0'
 
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+// -------------------------
+// Define missing properties
+// -------------------------
+def minecraft_version = '1.21.1'
+def minecraft_version_range = '[1.21.1,)'
+def forge_version = '52.1.0'
+def forge_version_range = '[52.1.0,)'
+def loader_version_range = '[0.14.0,)'
+def mod_id = 'modsync'
+def mod_name = 'ModSync'
+def mod_license = 'MIT'
+def mod_authors = 'R4T'
+def mod_description = 'ModSync allows players to join modded Minecraft servers easily without manually installing mods or modpacks. Supports automatic mod downloading, version synchronization, and seamless server connections.'
+
+// -------------------------
+// Minecraft configuration
+// -------------------------
 minecraft {
-    mappings channel: 'official', version: '1.21.1'
+    mappings channel: 'official', version: minecraft_version
 
     runs {
         client {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
+            args '--mod', 'modsync', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
             mods {
                 modsync {
                     source sourceSets.main
@@ -24,6 +46,20 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
+            args '--mod', 'modsync', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+            mods {
+                modsync {
+                    source sourceSets.main
+                    source project(':common').sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            args '--mod', 'modsync', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
             mods {
                 modsync {
                     source sourceSets.main
@@ -34,14 +70,30 @@ minecraft {
     }
 }
 
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+// -------------------------
+// Dependencies
+// -------------------------
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.21.1-51.0.33'
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation project(':common')
 
-    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
-    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
+    // Uncomment if you want JEI integration:
+    // compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
+    // compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
 }
 
+// -------------------------
+// Compilation options
+// -------------------------
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// -------------------------
+// Process resources with variable replacement
+// -------------------------
 processResources {
     def replaceProperties = [
             minecraft_version: minecraft_version,

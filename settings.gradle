@@ -3,7 +3,6 @@ pluginManagement {
         gradlePluginPortal()
         maven { url = "https://maven.minecraftforge.net/" }
         maven { url = "https://maven.fabricmc.net/" }
-        maven { url = "https://maven.quiltmc.org/repository/release/" }
     }
 }
 
@@ -12,4 +11,3 @@ rootProject.name = 'modsync'
 include 'common'
 include 'forge'
 include 'fabric'
-include 'quilt'

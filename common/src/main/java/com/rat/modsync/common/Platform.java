@@ -82,7 +82,7 @@ public interface Platform {
     ModInfo getModInfo(String modId);
 
     enum LoaderType {
-        FORGE, FABRIC, QUILT
+        FORGE, FABRIC
     }
 
     enum NotificationType {
