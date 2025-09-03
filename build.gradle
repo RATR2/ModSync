@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+group = 'com.rat.modsync'
+version = '1.0.0'
+
+allprojects {
+    apply plugin: 'java'
+    apply plugin: 'maven-publish'
+
+    group = rootProject.group
+    version = rootProject.version
+
+    repositories {
+        mavenCentral()
+        maven { url = "https://maven.minecraftforge.net/" }
+        maven { url = "https://maven.fabricmc.net/" }
+        maven { url = "https://maven.quiltmc.org/repository/release/" }
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+    }
+}
+
+subprojects {
+    dependencies {
+        compileOnly 'com.google.code.gson:gson:2.10.1'
+    }
+}

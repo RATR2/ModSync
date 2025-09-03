@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "quilt_loader": {
+    "group": "com.rat.modsync",
+    "id": "modsync",
+    "version": "${version}",
+    "metadata": {
+      "name": "ModSync",
+      "description": "ModSync allows players to join modded Minecraft servers easily without manually installing mods or modpacks. Supports automatic mod downloading, version synchronization, and seamless server connections.",
+      "contributors": {
+        "YourName": "R4T"
+      },
+      "contact": {
+        "homepage": "https://github.com/yourname/modsync",
+        "sources": "https://github.com/yourname/modsync",
+        "issues": "https://github.com/yourname/modsync/issues"
+      },
+      "license": "MIT",
+      "icon": "assets/modsync/icon.png"
+    },
+    "intermediate_mappings": "net.fabricmc:intermediary",
+    "entrypoints": {
+      "init": "com.yourname.modsync.quilt.ModSyncQuilt",
+      "client_init": "com.yourname.modsync.quilt.ModSyncQuilt",
+      "server_init": "com.yourname.modsync.quilt.ModSyncQuilt"
+    },
+    "depends": [
+      {
+        "id": "quilt_loader",
+        "versions": ">=0.25.0-"
+      },
+      {
+        "id": "quilted_fabric_api",
+        "versions": "*"
+      },
+      {
+        "id": "minecraft",
+        "versions": "~1.21.1"
+      }
+    ]
+  },
+  "mixin": []
+}

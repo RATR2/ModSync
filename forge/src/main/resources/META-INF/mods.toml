@@ -1,0 +1,30 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "MIT"
+
+[[mods]]
+modId = "modsync"
+version = "${mod_version}"
+displayName = "ModSync"
+description = '''
+ModSync allows players to join modded Minecraft servers easily without manually installing mods or modpacks.
+Supports automatic mod downloading, version synchronization, and seamless server connections.
+'''
+logoFile = "modsync_logo.png"
+credits = "Created for seamless modded server experiences"
+authors = "R4T"
+displayURL = "https://github.com/yourname/modsync"
+
+[[dependencies.modsync]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.modsync]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.21.1]"
+ordering = "NONE"
+side = "BOTH"

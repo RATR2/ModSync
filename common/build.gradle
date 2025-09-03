@@ -1,0 +1,11 @@
+dependencies {
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Test dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+    testImplementation 'org.mockito:mockito-core:5.1.1'
+}
+
+test {
+    useJUnitPlatform()
+}
