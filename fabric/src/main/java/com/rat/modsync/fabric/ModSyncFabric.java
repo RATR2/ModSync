@@ -5,15 +5,18 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.minecraft.server.network.ServerPlayerEntity;
 import io.netty.buffer.Unpooled;
 
 import java.nio.file.Path;
@@ -29,6 +32,8 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     private static ModSyncFabric INSTANCE;
 
     private final Map<String, PacketHandler> packetHandlers = new ConcurrentHashMap<>();
+
+    public static final Identifier GENERIC_PACKET_ID = Identifier.of(ModSync.MOD_ID, "generic");
 
     @Override
     public void onInitialize() {
@@ -50,12 +55,13 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     }
 
     private void setupNetworking() {
+        // Register the payload type
+        PayloadTypeRegistry.playS2C().register(GenericPayload.ID, GenericPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(GenericPayload.ID, GenericPayload.CODEC);
+
         // Client-side handler
         if (isClient()) {
-            ClientPlayNetworking.registerGlobalReceiver(new ResourceLocation(ModSync.MOD_ID, "generic"), (client, handler, buf, responseSender) -> {
-                byte[] data = new byte[buf.readableBytes()];
-                buf.readBytes(data);
-                GenericPayload payload = new GenericPayload("generic", data);
+            ClientPlayNetworking.registerGlobalReceiver(GenericPayload.ID, (payload, context) -> {
                 PacketHandler handlerImpl = packetHandlers.get(payload.channel());
                 if (handlerImpl != null) {
                     handlerImpl.handle(null, payload.data());
@@ -64,18 +70,15 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
         }
 
         // Server-side handler
-        ServerPlayNetworking.registerGlobalReceiver(new ResourceLocation(ModSync.MOD_ID, "generic"), (server, player, handler, buf, responseSender) -> {
-            byte[] data = new byte[buf.readableBytes()];
-            buf.readBytes(data);
-            GenericPayload payload = new GenericPayload("generic", data);
+        ServerPlayNetworking.registerGlobalReceiver(GenericPayload.ID, (payload, context) -> {
             PacketHandler handlerImpl = packetHandlers.get(payload.channel());
             if (handlerImpl != null) {
-                handlerImpl.handle(player, payload.data());
+                handlerImpl.handle(context.player(), payload.data());
             }
         });
     }
 
-    private void sendServerHandshake(ServerPlayer player) {
+    private void sendServerHandshake(ServerPlayerEntity player) {
         List<ModInfo> serverMods = getLoadedMods();
         ConfigManager.ServerConfig config = ModSync.getConfigManager().getServerConfig();
 
@@ -135,13 +138,13 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     @Override
     public void sendToServer(String channel, byte[] data) {
         if (!isClient()) return;
-        ClientPlayNetworking.send(new ResourceLocation(ModSync.MOD_ID, channel), new FriendlyByteBuf(Unpooled.wrappedBuffer(data)));
+        ClientPlayNetworking.send(new GenericPayload(channel, data));
     }
 
     @Override
     public void sendToClient(Object player, String channel, byte[] data) {
-        if (!(player instanceof ServerPlayer)) return;
-        ServerPlayNetworking.send((ServerPlayer) player, new ResourceLocation(ModSync.MOD_ID, channel), new FriendlyByteBuf(Unpooled.wrappedBuffer(data)));
+        if (!(player instanceof ServerPlayerEntity)) return;
+        ServerPlayNetworking.send((ServerPlayerEntity) player, new GenericPayload(channel, data));
     }
 
     @Override
@@ -152,15 +155,15 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     @Override
     public void scheduleRestart() {
         if (!isClient()) return;
-        Minecraft.getInstance().execute(() -> Minecraft.getInstance().stop());
+        MinecraftClient.getInstance().execute(() -> MinecraftClient.getInstance().stop());
     }
 
     @Override
     public void showNotification(String title, String message, NotificationType type) {
         if (!isClient()) return;
-        Minecraft mc = Minecraft.getInstance();
+        MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player != null) {
-            mc.player.sendSystemMessage(Component.literal("[" + title + "] " + message));
+            mc.player.sendMessage(Text.literal("[" + title + "] " + message), false);
         }
     }
 
@@ -169,7 +172,7 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
         if (!isClient()) return CompletableFuture.completedFuture(DialogResult.CANCEL);
 
         CompletableFuture<DialogResult> future = new CompletableFuture<>();
-        Minecraft.getInstance().execute(() -> {
+        MinecraftClient.getInstance().execute(() -> {
             showNotification(title, message, NotificationType.INFO);
             future.complete(DialogResult.ACCEPT);
         });
@@ -198,14 +201,23 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
     @Override
     public void connectToServer(String serverAddress) {
         if (!isClient()) return;
-        Minecraft.getInstance().execute(() ->
+        MinecraftClient.getInstance().execute(() ->
                 showNotification("ModSync", "Reconnecting to " + serverAddress, NotificationType.INFO));
     }
 
     /**
-     * Simple payload wrapper for Fabric networking
+     * Custom payload for Fabric networking
      */
-    public static class GenericPayload {
+    public static class GenericPayload implements CustomPayload {
+        public static final CustomPayload.Id<GenericPayload> ID = new CustomPayload.Id<>(GENERIC_PACKET_ID);
+        public static final PacketCodec<PacketByteBuf, GenericPayload> CODEC = PacketCodec.of(
+                (value, buf) -> {
+                    buf.writeString(value.channel);
+                    buf.writeByteArray(value.data);
+                },
+                (buf) -> new GenericPayload(buf.readString(), buf.readByteArray())
+        );
+
         private final String channel;
         private final byte[] data;
 
@@ -214,7 +226,17 @@ public class ModSyncFabric implements ModInitializer, ClientModInitializer, Dedi
             this.data = data;
         }
 
-        public String channel() { return channel; }
-        public byte[] data() { return data; }
+        public String channel() {
+            return channel;
+        }
+
+        public byte[] data() {
+            return data;
+        }
+
+        @Override
+        public Id<? extends CustomPayload> getId() {
+            return ID;
+        }
     }
 }

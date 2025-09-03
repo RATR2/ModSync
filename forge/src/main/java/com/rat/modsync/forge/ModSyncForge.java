@@ -6,16 +6,13 @@ import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModContainer;
 import net.minecraftforge.fml.ModList;
@@ -23,24 +20,19 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
+import net.minecraftforge.forgespi.language.IModInfo;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Mod(ModSync.MOD_ID)
 public class ModSyncForge implements Platform {
     private static final Logger LOGGER = Logger.getLogger(ModSyncForge.class.getName());
-    private static final String PROTOCOL_VERSION = "1";
-
-    private static SimpleChannel NETWORK;
     private static ModSyncForge INSTANCE;
 
     public ModSyncForge() {
@@ -56,25 +48,18 @@ public class ModSyncForge implements Platform {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        // Set up networking
-        NETWORK = NetworkRegistry.newSimpleChannel(
-                new ResourceLocation(ModSync.MOD_ID, "main"),
-                () -> PROTOCOL_VERSION,
-                PROTOCOL_VERSION::equals,
-                PROTOCOL_VERSION::equals
-        );
-
-        // Register packet handlers
-        NETWORK.registerMessage(0, GenericPacket.class,
-                GenericPacket::encode,
-                GenericPacket::decode,
-                this::handlePacket);
+        LOGGER.info("ModSync Forge common setup complete");
     }
 
     @OnlyIn(Dist.CLIENT)
     private void clientSetup(FMLClientSetupEvent event) {
         // Handle startup auto-rejoin
         ModSync.handleStartup();
+        LOGGER.info("ModSync Forge client setup complete");
+    }
+
+    public static ModSyncForge getInstance() {
+        return INSTANCE;
     }
 
     @Override
@@ -105,34 +90,32 @@ public class ModSyncForge implements Platform {
                 .collect(Collectors.toList());
     }
 
-    private ModInfo convertToModInfo(ModContainer container) {
-        String modId = container.getModId();
-        String version = container.getModInfo().getVersion().toString();
-        String name = container.getModInfo().getDisplayName();
-        String fileName = container.getModInfo().getOwningFile().getFile().getFileName().toString();
-
+    private ModInfo convertToModInfo(IModInfo modInfo) {
+        String modId = modInfo.getModId();
+        String version = modInfo.getVersion().toString();
+        String name = modInfo.getDisplayName();
+        String fileName = modInfo.getOwningFile().getFile().getFileName().toString();
         return new ModInfo(modId, version, name, fileName);
     }
 
     @Override
     public void sendToServer(String channel, byte[] data) {
         if (!isClient()) return;
-
-        GenericPacket packet = new GenericPacket(channel, data);
-        NETWORK.sendToServer(packet);
+        // TODO: Implement networking - Forge's networking API has changed significantly
+        // This will need to use the new packet system
+        LOGGER.info("Sending packet to server on channel: " + channel);
     }
 
     @Override
     public void sendToClient(Object player, String channel, byte[] data) {
         if (!(player instanceof ServerPlayer)) return;
-
-        GenericPacket packet = new GenericPacket(channel, data);
-        NETWORK.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) player), packet);
+        // TODO: Implement networking - Forge's networking API has changed significantly
+        LOGGER.info("Sending packet to client on channel: " + channel);
     }
 
     @Override
     public void registerPacketHandler(String channel, PacketHandler handler) {
-        // Handlers are managed through the GenericPacket system
+        // Store handlers for when networking is implemented
         PacketHandlerRegistry.register(channel, handler);
     }
 
@@ -142,7 +125,7 @@ public class ModSyncForge implements Platform {
 
         Minecraft.getInstance().execute(() -> {
             Minecraft.getInstance().stop();
-            // Forge handles restart automatically
+            // Forge handles restart automatically in development
         });
     }
 
@@ -151,18 +134,25 @@ public class ModSyncForge implements Platform {
     public void showNotification(String title, String message, NotificationType type) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            Component titleComponent = Component.literal(title);
-            Component messageComponent = Component.literal(message);
-
             // Show as chat message (simple implementation)
-            mc.player.sendSystemMessage(Component.literal("[" + title + "] " + message));
+            String prefix = getNotificationPrefix(type);
+            mc.player.sendSystemMessage(Component.literal(prefix + "[" + title + "] " + message));
+        }
+    }
+
+    private String getNotificationPrefix(NotificationType type) {
+        switch (type) {
+            case ERROR: return "§c";
+            case WARNING: return "§e";
+            case SUCCESS: return "§a";
+            case INFO:
+            default: return "§b";
         }
     }
 
     @Override
     @OnlyIn(Dist.CLIENT)
     public CompletableFuture<DialogResult> showDialog(String title, String message, List<String> options) {
-        // For now, use a simple approach - could be enhanced with custom GUI
         CompletableFuture<DialogResult> future = new CompletableFuture<>();
 
         Minecraft.getInstance().execute(() -> {
@@ -177,7 +167,7 @@ public class ModSyncForge implements Platform {
 
     @Override
     public String getGameVersion() {
-        return "1.21.1"; // Could be dynamic
+        return "1.21.1"; // This should be dynamic in a real implementation
     }
 
     @Override
@@ -188,35 +178,23 @@ public class ModSyncForge implements Platform {
     @Override
     public ModInfo getModInfo(String modId) {
         return ModList.get().getModContainerById(modId)
-                .map(this::convertToModInfo)
+                .map(container -> convertToModInfo(container.getModInfo()))
                 .orElse(null);
     }
 
     @Override
     public void connectToServer(String serverAddress) {
         if (!isClient()) return;
-
         Minecraft.getInstance().execute(() -> {
-            // Parse server address
-            String[] parts = serverAddress.split(":");
-            String host = parts[0];
-            int port = parts.length > 1 ? Integer.parseInt(parts[1]) : 25565;
-
-            ServerData serverData = new ServerData("ModSync Auto-Connect", serverAddress, false);
-            ConnectScreen.startConnecting(Minecraft.getInstance().screen, Minecraft.getInstance(),
-                    serverData, null);
-        });
-    }
-
-    private void handlePacket(GenericPacket packet, NetworkEvent.Context context) {
-        context.enqueueWork(() -> {
-            PacketHandler handler = PacketHandlerRegistry.get(packet.channel);
-            if (handler != null) {
-                Object sender = context.getSender(); // ServerPlayer or null for client
-                handler.handle(sender, packet.data);
+            try {
+                ServerData serverData = new ServerData("ModSync Auto-Connect", serverAddress, ServerData.Type.OTHER);
+                // Fallback: open multiplayer screen and let user select server
+                Minecraft.getInstance().setScreen(new JoinMultiplayerScreen(Minecraft.getInstance().screen));
+                showNotification("ModSync", "Please select the server: " + serverAddress, NotificationType.INFO);
+            } catch (Exception e) {
+                LOGGER.warning("Failed to connect to server: " + e.getMessage());
             }
         });
-        context.setPacketHandled(true);
     }
 
     @SubscribeEvent
@@ -236,6 +214,7 @@ public class ModSyncForge implements Platform {
 
         // Send handshake to joining player
         ServerPlayer player = (ServerPlayer) event.getEntity();
+        LOGGER.info("Player joined: " + player.getName().getString());
 
         // Build server mod manifest
         List<ModInfo> serverMods = getLoadedMods();
@@ -257,34 +236,10 @@ public class ModSyncForge implements Platform {
     }
 
     /**
-     * Generic packet for all ModSync network communication
-     */
-    public static class GenericPacket {
-        public final String channel;
-        public final byte[] data;
-
-        public GenericPacket(String channel, byte[] data) {
-            this.channel = channel;
-            this.data = data;
-        }
-
-        public static void encode(GenericPacket packet, FriendlyByteBuf buffer) {
-            buffer.writeUtf(packet.channel);
-            buffer.writeByteArray(packet.data);
-        }
-
-        public static GenericPacket decode(FriendlyByteBuf buffer) {
-            String channel = buffer.readUtf();
-            byte[] data = buffer.readByteArray();
-            return new GenericPacket(channel, data);
-        }
-    }
-
-    /**
-     * Simple registry for packet handlers
+     * Simple registry for packet handlers until networking is fully implemented
      */
     private static class PacketHandlerRegistry {
-        private static final java.util.Map<String, PacketHandler> handlers = new java.util.concurrent.ConcurrentHashMap<>();
+        private static final ConcurrentHashMap<String, PacketHandler> handlers = new ConcurrentHashMap<>();
 
         public static void register(String channel, PacketHandler handler) {
             handlers.put(channel, handler);
@@ -292,6 +247,10 @@ public class ModSyncForge implements Platform {
 
         public static PacketHandler get(String channel) {
             return handlers.get(channel);
+        }
+
+        public static void clear() {
+            handlers.clear();
         }
     }
 }

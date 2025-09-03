@@ -18,6 +18,7 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:1.21.1-52.1.0"
     implementation 'com.google.code.gson:gson:2.10.1'
+    implementation project(':common')
 }
 
 minecraft {

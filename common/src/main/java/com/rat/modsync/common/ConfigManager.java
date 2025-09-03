@@ -34,8 +34,11 @@ public class ConfigManager {
     }
 
     private void loadConfigs() {
-        clientConfig = loadConfig("client.json", ClientConfig.class, ClientConfig::createDefault);
-        serverConfig = loadConfig("server.json", ServerConfig.class, ServerConfig::createDefault);
+        if (platform.isClient()) {
+            clientConfig = loadConfig("client.json", ClientConfig.class, ClientConfig::createDefault);
+        } else if (platform.isServer()) {
+            serverConfig = loadConfig("server.json", ServerConfig.class, ServerConfig::createDefault);
+        }
     }
 
     private <T> T loadConfig(String fileName, Class<T> clazz, ConfigSupplier<T> defaultSupplier) {
